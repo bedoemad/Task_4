@@ -29,7 +29,6 @@ describe('Authentication controller integration', () => {
 
   beforeAll(async () => {
     await connectDB();
-    // Guarantee a clean slate for the email we are about to register.
     await User.deleteOne({ email: credentials.email.toLowerCase() });
 
     serverInstance = await startHttpServer();
@@ -38,9 +37,7 @@ describe('Authentication controller integration', () => {
   });
 
   afterAll(async () => {
-    // Remove the test artefacts so the live database stays tidy for future runs.
     await User.deleteOne({ email: credentials.email.toLowerCase() });
-
     await new Promise((resolve) => serverInstance.close(resolve));
     await mongoose.connection.close();
   });
@@ -54,8 +51,6 @@ describe('Authentication controller integration', () => {
 
     const payload = await response.json();
 
-    // Successful registration should return 201 alongside a token and the
-    // public portion of the newly saved user record.
     expect(response.status).toBe(201);
     expect(payload.token).toBeTruthy();
     expect(payload.user.email).toBe(credentials.email.toLowerCase());
@@ -64,17 +59,30 @@ describe('Authentication controller integration', () => {
     issuedToken = payload.token;
   });
 
-  /*
-  TODO: test login behaviour
-  - attempt login request with user credentials
-  - expect a 200 response
-  - expect a JWT token in the response
-  - expect the returned user profile to match the registered user
-  - store the issued token for use in subsequent tests
-  */
+  /* --------------------------------------------------------------
+     Implemented TODO: login behaviour
+     -------------------------------------------------------------- */
   test('authenticates the same user and issues a fresh JWT', async () => {
-    // This test will always fail until the TODO above is implemented.
-    expect(true).toBe(false);
+    const loginPayload = {
+      email: credentials.email,
+      password: credentials.password,
+    };
+
+    const response = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loginPayload),
+    });
+
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.token).toBeTruthy();
+    expect(payload.user.email).toBe(credentials.email.toLowerCase());
+    expect(payload.user.name).toBe(credentials.name);
+    expect(payload.user).not.toHaveProperty('passwordHash');
+
+    issuedToken = payload.token;
   });
 
   test('returns the public profile for the currently authenticated user', async () => {
@@ -84,7 +92,6 @@ describe('Authentication controller integration', () => {
 
     const payload = await response.json();
 
-    // A valid token must yield the sanitized user profile.
     expect(response.status).toBe(200);
     expect(payload.user.email).toBe(credentials.email.toLowerCase());
     expect(payload.user).not.toHaveProperty('passwordHash');
